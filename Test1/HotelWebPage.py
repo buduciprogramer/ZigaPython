@@ -3,9 +3,8 @@ from tkinter import messagebox, simpledialog
 import datetime
 import os
 
+# Gosti lista i fajl
 guests = []
-
-# === FAJL OPERACIJE ===
 
 def save_to_file():
     with open("guests.txt", "w", encoding="utf-8") as f:
@@ -14,6 +13,7 @@ def save_to_file():
             f.write(line)
 
 def load_from_file():
+    guests.clear()
     try:
         with open("guests.txt", "r", encoding="utf-8") as f:
             for line in f:
@@ -30,64 +30,7 @@ def load_from_file():
     except FileNotFoundError:
         pass
 
-# === FUNKCIJE ===
-
-def order_food():
-    room = simpledialog.askstring("Narudžba", "Unesite broj sobe:")
-    guest_found = None
-    for g in guests:
-        if g["room"] == room:
-            guest_found = g
-            break
-        
-    if not guest_found:
-        messagebox.showerror("Greška", "Soba nije pronađena.")
-        return
-
-    menu = {
-        "1": ("Masala Dosa", 130),
-        "2": ("Butter Naan", 20),
-        "3": ("Paneer Dosa", 130),
-        "4": ("Tea", 10),
-        "5": ("Coffee", 15),
-    }
-
-    total = 0
-    while True:
-        menu_str = "\n".join([f"{code}. {item} - {price} KM" for code, (item, price) in menu.items()])
-        choice = simpledialog.askstring("Meni", f"{menu_str}\nOdaberi broj artikla (ili 0 za kraj):")
-        if choice == "0" or choice is None:
-            break
-        elif choice in menu:
-            item, price = menu[choice]
-            total += price
-            messagebox.showinfo("Dodano", f"Dodano: {item} - {price} KM")
-        else:
-            messagebox.showwarning("Neispravno", "Pogrešan unos.")
-
-    guest_found["restaurant_total"] += total
-    save_to_file()
-    messagebox.showinfo("Račun", f"Ukupan račun za hranu: {total} KM")
-
-def delete_guest():
-    last_name = simpledialog.askstring("Brisanje gosta", "Unesite prezime gosta:")
-    global guests
-    before = len(guests)
-    guests = [g for g in guests if g["last_name"].lower() != last_name.lower()]
-    after = len(guests)
-    save_to_file()
-    if before == after:
-        messagebox.showinfo("Brisanje", "Gost nije pronađen.")
-    else:
-        messagebox.showinfo("Brisanje", "Gost obrisan.")
-
-def search_guest():
-    room = simpledialog.askstring("Pretraga", "Unesite broj sobe:")
-    for g in guests:
-        if g["room"] == room:
-            messagebox.showinfo("Gost pronađen", f"{g['first_name']} {g['last_name']} - {g['checkin']} → {g['checkout']}")
-            return
-    messagebox.showinfo("Pretraga", "Gost nije pronađen.")
+# Funkcije
 
 def gui_add_guest():
     add_window = tk.Toplevel()
@@ -105,17 +48,19 @@ def gui_add_guest():
 
     def submit_guest():
         try:
-            first_name = entries[0].get()
-            last_name = entries[1].get()
-            room_number = entries[2].get()
-            checkin_date = entries[3].get()
-            checkout_date = entries[4].get()
-            price_per_day = float(entries[5].get().replace(",", "."))
+            first_name = entries[0].get().strip()
+            last_name = entries[1].get().strip()
+            room_number = entries[2].get().strip()
+            checkin_date = entries[3].get().strip()
+            checkout_date = entries[4].get().strip()
+            price_per_day = float(entries[5].get().replace(",", ".").strip())
+
+            if not first_name or not last_name or not room_number:
+                raise ValueError("Ime, prezime i broj sobe ne smeju biti prazni.")
 
             d1 = datetime.datetime.strptime(checkin_date, "%Y-%m-%d")
             d2 = datetime.datetime.strptime(checkout_date, "%Y-%m-%d")
             number_of_days = (d2 - d1).days
-
             if number_of_days <= 0:
                 raise ValueError("Datum odjave mora biti posle datuma prijave.")
 
@@ -160,45 +105,85 @@ def gui_show_all():
 
     text.insert("end", f"\nUkupan iznos za sve goste: {total_all:.2f} KM")
 
-# === GLAVNI MENI ===
+def delete_guest():
+    last_name = simpledialog.askstring("Brisanje gosta", "Unesite prezime gosta:")
+    if not last_name:
+        return
+    global guests
+    before = len(guests)
+    guests = [g for g in guests if g["last_name"].lower() != last_name.lower()]
+    save_to_file()
+    after = len(guests)
+    if before == after:
+        messagebox.showinfo("Brisanje", "Gost nije pronađen.")
+    else:
+        messagebox.showinfo("Brisanje", "Gost obrisan.")
 
-def main_gui():
-    root = tk.Tk()
-    root.title("Hotel Management System")
-    root.geometry("400x400")
+def search_guest():
+    room = simpledialog.askstring("Pretraga", "Unesite broj sobe:")
+    if not room:
+        return
+    for g in guests:
+        if g["room"] == room:
+            messagebox.showinfo("Gost pronađen", f"{g['first_name']} {g['last_name']} - {g['checkin']} → {g['checkout']}")
+            return
+    messagebox.showinfo("Pretraga", "Gost nije pronađen.")
 
-    tk.Label(root, text="Hotel Management Menu", font=("Arial", 16)).pack(pady=10)
+def order_food():
+    room = simpledialog.askstring("Narudžba", "Unesite broj sobe:")
+    if not room:
+        return
+    guest_found = next((g for g in guests if g["room"] == room), None)
+    if not guest_found:
+        messagebox.showerror("Greška", "Soba nije pronađena.")
+        return
 
-    tk.Button(root, text="1. Dodaj gosta", width=30, command=gui_add_guest).pack(pady=5)
-    tk.Button(root, text="2. Prikaži sve goste", width=30, command=gui_show_all).pack(pady=5)
-    tk.Button(root, text="3. Obriši gosta", width=30, command=delete_guest).pack(pady=5)
-    tk.Button(root, text="4. Pretraga po sobi", width=30, command=search_guest).pack(pady=5)
-    tk.Button(root, text="5. Naruči hranu", width=30, command=order_food).pack(pady=5)
-    tk.Button(root, text="6. Izlaz", width=30, command=root.quit).pack(pady=20)
+    menu = {
+        "1": ("Masala Dosa", 130),
+        "2": ("Butter Naan", 20),
+        "3": ("Paneer Dosa", 130),
+        "4": ("Tea", 10),
+        "5": ("Coffee", 15),
+    }
 
-    root.mainloop()
+    total = 0
+    while True:
+        menu_str = "\n".join([f"{code}. {item} - {price} KM" for code, (item, price) in menu.items()])
+        choice = simpledialog.askstring("Meni", f"{menu_str}\nOdaberi broj artikla (ili 0 za kraj):")
+        if choice is None or choice == "0":
+            break
+        elif choice in menu:
+            item, price = menu[choice]
+            total += price
+            messagebox.showinfo("Dodano", f"Dodano: {item} - {price} KM")
+        else:
+            messagebox.showwarning("Neispravno", "Pogrešan unos.")
 
-# === LOGIN ZA VLASNIKA ===
+    if total > 0:
+        guest_found["restaurant_total"] += total
+        save_to_file()
+        messagebox.showinfo("Račun", f"Ukupan račun za hranu: {total} KM")
+
+# Login i lozinka
 
 def create_owner_credentials_file():
-    # Ako fajl ne postoji, napravi ga sa default podacima
     if not os.path.exists("owner_credentials.txt"):
         with open("owner_credentials.txt", "w", encoding="utf-8") as f:
             f.write("admin,admin\n")
 
-def login_screen():
-    create_owner_credentials_file()  # kreiraj fajl ako ne postoji
+def login_screen(root):
+    root.title("Prijava vlasnika")
+    root.geometry("300x230")
 
-    login = tk.Tk()
-    login.title("Prijava vlasnika")
-    login.geometry("300x200")
+    for widget in root.winfo_children():
+        widget.destroy()
 
-    tk.Label(login, text="Korisničko ime:").pack(pady=5)
-    username_entry = tk.Entry(login)
+    tk.Label(root, text="Korisničko ime:").pack(pady=5)
+    username_entry = tk.Entry(root)
     username_entry.pack()
 
-    tk.Label(login, text="Lozinka:").pack(pady=5)
-    password_entry = tk.Entry(login, show="*")
+    tk.Label(root, text="Lozinka:").pack(pady=5)
+    password_entry = tk.Entry(root, show="*")
     password_entry.pack()
 
     def check_login():
@@ -210,54 +195,15 @@ def login_screen():
                 for line in f:
                     user, pwd = line.strip().split(",")
                     if username == user and password == pwd:
-                        login.destroy()
-                        main_gui()
+                        main_gui(root)
                         return
         except FileNotFoundError:
             messagebox.showerror("Greška", "Fajl sa podacima o vlasniku nije pronađen.")
-
-        messagebox.showerror("Greška", "Pogrešno korisničko ime ili lozinka.")
-
-
-
-
-
-    tk.Button(login, text="Prijavi se", command=check_login).pack(pady=15)
-    login.mainloop()
-
-
-def login_screen():
-    login = tk.Tk()
-    login.title("Prijava vlasnika")
-    login.geometry("300x230")
-
-    tk.Label(login, text="Korisničko ime:").pack(pady=5)
-    username_entry = tk.Entry(login)
-    username_entry.pack()
-
-    tk.Label(login, text="Lozinka:").pack(pady=5)
-    password_entry = tk.Entry(login, show="*")
-    password_entry.pack()
-
-    def check_login():
-        username = username_entry.get().strip()
-        password = password_entry.get().strip()
-
-        try:
-            with open("owner_credentials.txt", "r", encoding="utf-8") as f:
-                for line in f:
-                    user, pwd = line.strip().split(",")
-                    if username == user and password == pwd:
-                        login.destroy()
-                        main_gui()
-                        return
-        except FileNotFoundError:
-            messagebox.showerror("Greška", "Fajl sa podacima o vlasniku nije pronađen.")
+            return
 
         messagebox.showerror("Greška", "Pogrešno korisničko ime ili lozinka.")
 
     def open_change_password():
-        # Funkcija za otvaranje prozora za promenu lozinke
         def submit_new_password():
             old_pwd = old_entry.get()
             new_pwd = new_entry.get()
@@ -289,7 +235,7 @@ def login_screen():
             messagebox.showinfo("Uspeh", "Lozinka je uspešno promenjena.")
             change_pw_window.destroy()
 
-        change_pw_window = tk.Toplevel(login)
+        change_pw_window = tk.Toplevel(root)
         change_pw_window.title("Promena lozinke")
         change_pw_window.geometry("300x200")
 
@@ -307,16 +253,32 @@ def login_screen():
 
         tk.Button(change_pw_window, text="Promeni lozinku", command=submit_new_password).pack(pady=10)
 
-    tk.Button(login, text="Prijavi se", command=check_login).pack(pady=10)
-    tk.Button(login, text="Promeni lozinku", command=open_change_password).pack()
+    tk.Button(root, text="Prijavi se", command=check_login).pack(pady=10)
+    tk.Button(root, text="Promeni lozinku", command=open_change_password).pack()
 
-    login.mainloop()
+# Glavni meni
 
+def main_gui(root):
+    for widget in root.winfo_children():
+        widget.destroy()
 
+    root.title("Hotel Management System")
+    root.geometry("400x400")
 
+    tk.Label(root, text="Hotel Management Menu", font=("Arial", 16)).pack(pady=10)
 
+    tk.Button(root, text="1. Dodaj gosta", width=30, command=gui_add_guest).pack(pady=5)
+    tk.Button(root, text="2. Prikaži sve goste", width=30, command=gui_show_all).pack(pady=5)
+    tk.Button(root, text="3. Obriši gosta", width=30, command=delete_guest).pack(pady=5)
+    tk.Button(root, text="4. Pretraga po sobi", width=30, command=search_guest).pack(pady=5)
+    tk.Button(root, text="5. Naruči hranu", width=30, command=order_food).pack(pady=5)
+    tk.Button(root, text="6. Izlaz", width=30, command=root.quit).pack(pady=20)
 
-# === POKRETANJE ===
+# Start
 
-load_from_file()
-login_screen()
+if __name__ == "__main__":
+    load_from_file()
+    create_owner_credentials_file()
+    root = tk.Tk()
+    login_screen(root)
+    root.mainloop()

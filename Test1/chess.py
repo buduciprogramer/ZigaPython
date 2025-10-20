@@ -261,7 +261,6 @@ class ChessGame:
                     if self.is_valid_move(piece, r, c, row, col):
                         return True
         return False
-
     def has_valid_moves(self, color):
         for r1 in range(BOARD_SIZE):
             for c1 in range(BOARD_SIZE):
@@ -283,8 +282,6 @@ class ChessGame:
                                 if not in_check:
                                     return True
         return False
-
-
 if __name__ == "__main__":
     root = tk.Tk()
     game = ChessGame(root)
